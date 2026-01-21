@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAMC Doctors Association | Dynamic Portal</title>
+    <style>
+        :root {
+            --primary: #004a99;
+            --success: #28a745;
+            --bg-color: #f4f7f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            margin: 0;
+            background: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), 
+                        url('https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=2000');
+            background-size: cover;
+            background-attachment: fixed;
+        }
+
+        .navbar {
+            background: var(--primary);
+            color: white;
+            padding: 15px 5%;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            position: sticky; top: 0; z-index: 1000;
+        }
+
+        .container { max-width: 1100px; margin: 30px auto; padding: 20px; }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px; border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin-bottom: 30px;
+        }
+
+        /* Dynamic Tabs Styling */
+        .dept-tabs {
+            display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 25px; justify-content: center;
+        }
+
+        .tab-btn {
+            padding: 10px 22px; background: #fff; border: 2px solid var(--primary);
+            border-radius: 25px; cursor: pointer; font-weight: 600; color: var(--primary);
+            transition: 0.3s; text-transform: capitalize;
+        }
+
+        .tab-btn.active { background: var(--primary); color: white; }
+
+        /* Form Layout */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .full-width { grid-column: span 2; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        
+        .btn { padding: 12px 25px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-submit { background: var(--primary); color: white; width: 100%; margin-top: 15px; }
+
+        /* Doctor Cards */
+        .doc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .doc-card { 
+            background: #fff; padding: 20px; border-radius: 12px; text-align: center;
+            border-top: 5px solid var(--primary); box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        .doc-card img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; border: 2px solid #eee; }
+
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .admin-table th, .admin-table td { padding: 12px; border: 1px solid #eee; text-align: left; }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div>⚕️ <strong>MAMC Doctors Association</strong></div>
+    <button class="btn" style="background:#333; color:white;" onclick="toggleAdminAuth()">Admin Portal</button>
+</nav>
+
+<div class="container">
+    
+    <div id="adminAuth" class="card hidden">
+        <h3>Admin Login (ID: mamc_admin / Pass: mamc2026)</h3>
+        <input type="text" id="adminID" placeholder="User ID">
+        <input type="password" id="adminPass" placeholder="Password" style="margin-top:10px;">
+        <button class="btn btn-submit" onclick="loginAdmin()">Login</button>
+    </div>
+
+    <div id="adminSection" class="card hidden">
+        <h2>Admin Dashboard</h2>
+        <div style="overflow-x: auto;">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Photo</th><th>Name</th><th>Degree</th><th>Specialization</th><th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="adminTableBody"></tbody>
+            </table>
+        </div>
+        <button class="btn" style="background:#dc3545; color:white; margin-top:20px;" onclick="location.reload()">Logout</button>
+    </div>
+
+    <div class="card">
+        <h2>Register New Doctor Profile</h2>
+        <form id="regForm" class="form-grid">
+            <div><label>Full Name</label><input type="text" id="name" placeholder="Name" required></div>
+            <div><label>Phone Number</label><input type="number" id="phone" placeholder="Phone Number" required></div>
+            <div><label>MAMC Batch Year</label><input type="number" id="batch" placeholder="Batch" required></div>
+            <div><label>Medical Degree</label><input type="text" id="degree" placeholder="Degree" required></div>
+            <div class="full-width">
+                <label>Specialization (This will create a new department section auto)</label>
+                <input type="text" id="spec" placeholder="e.g. Neurology, Cardiology, Radiology" required>
+            </div>
+            <div class="full-width">
+                <label>Upload Photo</label>
+                <input type="file" id="photoInput" accept="image/*" required>
+            </div>
+            <button type="submit" class="btn btn-submit full-width">Submit for Verification</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Department-wise Directory</h2>
+        
+        <div class="dept-tabs" id="dynamicTabs">
+            <button class="tab-btn active" onclick="setFilter('All')">All Doctors</button>
+        </div>
+
+        <div class="doc-grid" id="publicList"></div>
+    </div>
+</div>
+
+<script>
+    let doctors = [];
+    let currentPhoto = "";
+    let currentFilter = "All";
+
+    document.getElementById('photoInput').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = () => currentPhoto = reader.result;
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    function toggleAdminAuth() { document.getElementById('adminAuth').classList.toggle('hidden'); }
+
+    function loginAdmin() {
+        if(document.getElementById('adminID').value === "mamc_admin" && document.getElementById('adminPass').value === "mamc2026") {
+            document.getElementById('adminSection').classList.remove('hidden');
+            document.getElementById('adminAuth').classList.add('hidden');
+            updateUI();
+        } else { alert("Invalid Credentials!"); }
+    }
+
+    document.getElementById('regForm').onsubmit = (e) => {
+        e.preventDefault();
+        doctors.push({
+            id: Date.now(),
+            name: document.getElementById('name').value,
+            phone: document.getElementById('phone').value,
+            batch: document.getElementById('batch').value,
+            degree: document.getElementById('degree').value,
+            spec: document.getElementById('spec').value.trim(),
+            photo: currentPhoto,
+            status: 'pending'
+        });
+        alert("Registration Submitted!");
+        e.target.reset();
+        updateUI();
+    };
+
+    function approveDoc(id) {
+        doctors.find(d => d.id === id).status = 'approved';
+        updateUI();
+    }
+
+    function setFilter(dept) {
+        currentFilter = dept;
+        updateUI();
+    }
+
+    function updateUI() {
+        const adminBody = document.getElementById('adminTableBody');
+        const publicList = document.getElementById('publicList');
+        const tabContainer = document.getElementById('dynamicTabs');
+        
+        adminBody.innerHTML = '';
+        publicList.innerHTML = '';
+
+        // 1. Get Unique Departments from Approved Doctors
+        const approvedDocs = doctors.filter(d => d.status === 'approved');
+        const departments = ['All', ...new Set(approvedDocs.map(d => d.spec))];
+
+        // 2. Render Tabs Dynamically
+        tabContainer.innerHTML = '';
+        departments.forEach(dept => {
+            const btn = document.createElement('button');
+            btn.className = `tab-btn ${currentFilter === dept ? 'active' : ''}`;
+            btn.innerText = dept;
+            btn.onclick = () => setFilter(dept);
+            tabContainer.appendChild(btn);
+        });
+
+        // 3. Render Admin & Public List
+        doctors.forEach(doc => {
+            // Admin Table
+            adminBody.innerHTML += `<tr>
+                <td><img src="${doc.photo}" width="40" height="40" style="border-radius:50%"></td>
+                <td>${doc.name}</td><td>${doc.degree}</td><td>${doc.spec}</td>
+                <td>${doc.status === 'pending' ? `<button onclick="approveDoc(${doc.id})">Approve</button>` : 'Approved'}</td>
+            </tr>`;
+
+            // Public View with Filter
+            if(doc.status === 'approved') {
+                if(currentFilter === 'All' || doc.spec === currentFilter) {
+                    publicList.innerHTML += `
+                    <div class="doc-card">
+                        <img src="${doc.photo}">
+                        <h3>${doc.name}</h3>
+                        <p style="color:var(--primary); font-weight:bold;">${doc.degree}</p>
+                        <p><strong>Dept:</strong> ${doc.spec}</p>
+                        <p style="font-size:13px; color:#666;">Batch: ${doc.batch} | 📞 ${doc.phone}</p>
+                        <div style="color:green; font-weight:bold; margin-top:10px; border:1px solid green; border-radius:5px; padding:2px;">Verified Profile</div>
+                    </div>`;
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>
